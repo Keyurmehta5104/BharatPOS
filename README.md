@@ -1,4 +1,4 @@
-# BharatPOS 🧾
+# BhaaratPOS 🧾
 
 A modern dual-mode Point of Sale (POS) system for 
 Indian restaurants and retail shops. Built with 
@@ -155,7 +155,7 @@ src/
 
 **Keyur Mehta**
 - GitHub: [@Keyurmehta5104](https://github.com/Keyurmehta5104)
-- Location: Surat, Gujarat, India
+- Location: Rajkot, Gujarat, India
 
 ---
 
