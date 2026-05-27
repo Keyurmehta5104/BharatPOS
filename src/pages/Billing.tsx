@@ -241,6 +241,7 @@ export const Billing: React.FC = () => {
         tax: cartTax,
         grandTotal: cartTotal,
         paymentMethod,
+        status: "completed",
         createdAt: new Date().toISOString()
       });
 

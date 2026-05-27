@@ -41,6 +41,7 @@ export const SidebarLayout: React.FC<SidebarProps> = ({ children }) => {
   const retailLinks = [
     { name: "Dashboard", path: "/dashboard", icon: LayoutDashboard },
     { name: "Billing", path: "/billing", icon: Receipt },
+    { name: "Sales History", path: "/orders", icon: ShoppingBag },
     { name: "Products", path: "/products", icon: ShoppingBag },
     { name: "Customers", path: "/customers", icon: Users },
     { name: "Reports", path: "/reports", icon: BarChart3 },
