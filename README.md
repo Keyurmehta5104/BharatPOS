@@ -1,73 +1,163 @@
-# React + TypeScript + Vite
+# BharatPOS 🧾
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A modern dual-mode Point of Sale (POS) system for 
+Indian restaurants and retail shops. Built with 
+React, TypeScript, Firebase, and Tailwind CSS.
 
-Currently, two official plugins are available:
+![BharatPOS](https://img.shields.io/badge/BharatPOS-v1.0-orange)
+![React](https://img.shields.io/badge/React-18-blue)
+![TypeScript](https://img.shields.io/badge/TypeScript-5-blue)
+![Firebase](https://img.shields.io/badge/Firebase-Firestore-orange)
+![License](https://img.shields.io/badge/License-MIT-green)
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## 🌐 Live Demo
+👉 [https://bhaaratpos.netlify.app](https://bhaaratpos.netlify.app)
 
-## React Compiler
+> Use "Load Demo Data" button on dashboard to 
+> populate sample data for testing.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+---
 
-## Expanding the ESLint configuration
+## 🍽️ Restaurant Mode
+- Menu management (categories + items with 
+  Veg/Non-Veg indicators)
+- Table management (Main Hall / Outdoor / VIP)
+- Live order taking with cart
+- Kitchen Order Ticket (KOT) system
+- **Kitchen Display System (KDS)** — separate 
+  screen for kitchen staff with PIN login
+- Item-by-item cooking status tracking
+- Real-time waiter notifications
+- Bill generation with Cash/UPI/Card payment
+- Orders history with expandable details
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+## 🛒 Retail Mode
+- Product catalog with image upload (Cloudinary)
+- Low stock alerts
+- Quick billing POS screen (two-panel cashier)
+- Customer management (loyalty tracking)
+- Stock update + bulk stock update
+- Sales history with date filters
+- Receipt printing
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+## 📊 Both Modes
+- Real-time dashboard metrics
+- Reports with charts (Recharts)
+- Sales trends, top items, payment breakdown
+- Export data as CSV
+- Demo data controls (Load / Clear / Export)
+- Settings page with business profile
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+---
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+## 🛠️ Tech Stack
+
+| Layer | Technology |
+|---|---|
+| Frontend | React 18 + Vite + TypeScript |
+| Styling | Tailwind CSS v4 + shadcn/ui |
+| Auth | Firebase Authentication |
+| Database | Firebase Firestore |
+| Image Upload | Cloudinary |
+| Charts | Recharts |
+| Routing | React Router v6 |
+| Deployment | Netlify |
+
+---
+
+## 🚀 Getting Started
+
+### Prerequisites
+- Node.js 18+
+- Firebase account
+- Cloudinary account
+
+### Installation
+
+```bash
+# Clone the repo
+git clone https://github.com/Keyurmehta5104/BharatPOS.git
+
+# Install dependencies
+cd BharatPOS
+npm install
+
+# Create .env file
+cp .env.example .env
+# Fill in your Firebase and Cloudinary keys
+
+# Start development server
+npm run dev
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+### Environment Variables
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+Create a `.env` file with:
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
 ```
+VITE_FIREBASE_API_KEY=
+VITE_FIREBASE_AUTH_DOMAIN=
+VITE_FIREBASE_PROJECT_ID=
+VITE_FIREBASE_STORAGE_BUCKET=
+VITE_FIREBASE_MESSAGING_SENDER_ID=
+VITE_FIREBASE_APP_ID=
+VITE_CLOUDINARY_CLOUD_NAME=
+VITE_CLOUDINARY_UPLOAD_PRESET=
+```
+
+---
+
+## 📱 Kitchen Display System
+
+Kitchen staff can access a separate display at:
+```
+https://your-domain/kitchen/login
+```
+- Enter Business UID (from Settings page)
+- Enter 4-digit PIN (default: 1234)
+- Real-time order updates
+- Item-by-item status tracking
+- Works on tablets
+
+---
+
+## 📸 Screenshots
+
+> Restaurant Dashboard — Table Management — 
+> Kitchen Display — Retail POS Billing
+
+---
+
+## 🗂️ Project Structure
+
+```
+src/
+  components/     → Sidebar, ProtectedRoute
+  context/        → AuthContext
+  lib/            → Firebase, Auth, Utils, DemoData
+  pages/          → All page components
+    Dashboard.tsx
+    Tables.tsx
+    Menu.tsx
+    Orders.tsx
+    KitchenDisplay.tsx
+    KitchenLogin.tsx
+    Billing.tsx
+    Products.tsx
+    Customers.tsx
+    Reports.tsx
+    Settings.tsx
+```
+
+---
+
+## 👨‍💻 Developer
+
+**Keyur Mehta**
+- GitHub: [@Keyurmehta5104](https://github.com/Keyurmehta5104)
+- Location: Surat, Gujarat, India
+
+---
+
+## 📄 License
+MIT License — free to use and modify.
