@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useAuth } from "../context/AuthContext";
-import { collection, doc, addDoc, updateDoc, deleteDoc, onSnapshot, query, orderBy } from "firebase/firestore";
+import { collection, doc, addDoc, updateDoc, deleteDoc, onSnapshot, query, orderBy, writeBatch } from "firebase/firestore";
 import { db } from "../lib/firebase";
 import { SidebarLayout } from "../components/Sidebar";
 import {
@@ -15,7 +15,10 @@ import {
   ToggleRight,
   Upload,
   X,
-  Search
+  Search,
+  Package,
+  CheckCircle2,
+  XCircle
 } from "lucide-react";
 
 interface Product {
@@ -65,6 +68,28 @@ export const Products: React.FC = () => {
 
   // Deletions
   const [deletingProductId, setDeletingProductId] = useState<string | null>(null);
+
+  // ─── Stock Update States ───
+  const [stockDialogOpen, setStockDialogOpen] = useState(false);
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [stockMode, setStockMode] = useState<"add" | "set">("add");
+  const [stockInput, setStockInput] = useState("");
+
+  // ─── Bulk Stock Update States ───
+  const [bulkDialogOpen, setBulkDialogOpen] = useState(false);
+  const [bulkChanges, setBulkChanges] = useState<Record<string, { mode: "add" | "set"; value: string }>>({});
+  const [bulkConfirmOpen, setBulkConfirmOpen] = useState(false);
+  const [bulkSaving, setBulkSaving] = useState(false);
+
+  // ─── Toast Notification ───
+  const [toastNotif, setToastNotif] = useState<{ message: string; type: "success" | "error" } | null>(null);
+
+  useEffect(() => {
+    if (toastNotif) {
+      const timer = setTimeout(() => setToastNotif(null), 4000);
+      return () => clearTimeout(timer);
+    }
+  }, [toastNotif]);
 
   // 1. Fetch Categories & Products from Firestore
   useEffect(() => {
@@ -239,6 +264,91 @@ export const Products: React.FC = () => {
     }
   };
 
+  // ─── 6. Individual Stock Update ───
+  const openStockDialog = (product: Product) => {
+    setSelectedProduct(product);
+    setStockMode("add");
+    setStockInput("");
+    setStockDialogOpen(true);
+  };
+
+  const handleStockConfirm = async () => {
+    if (!selectedProduct || !user || !stockInput) return;
+    const inputVal = Number(stockInput);
+    if (isNaN(inputVal) || inputVal < 0) return;
+
+    const oldStock = selectedProduct.stock;
+    const newStock = stockMode === "add" ? oldStock + inputVal : inputVal;
+
+    try {
+      const productRef = doc(db, "businesses", user.uid, "products", selectedProduct.id);
+      await updateDoc(productRef, { stock: newStock });
+      setToastNotif({
+        message: `Stock updated — ${selectedProduct.name}: ${oldStock} → ${newStock} ${selectedProduct.unit}`,
+        type: "success"
+      });
+      setStockDialogOpen(false);
+    } catch (err) {
+      console.error(err);
+      setToastNotif({ message: "Failed to update stock.", type: "error" });
+    }
+  };
+
+  // ─── 7. Bulk Stock Update ───
+  const openBulkDialog = () => {
+    // Initialize bulkChanges with empty values for each product
+    const initial: Record<string, { mode: "add" | "set"; value: string }> = {};
+    products.forEach((p) => {
+      initial[p.id] = { mode: "add", value: "" };
+    });
+    setBulkChanges(initial);
+    setBulkDialogOpen(true);
+  };
+
+  const handleBulkUpdate = async () => {
+    if (!user) return;
+    setBulkSaving(true);
+
+    try {
+      const batch = writeBatch(db);
+      let updateCount = 0;
+
+      Object.entries(bulkChanges).forEach(([id, { mode, value }]) => {
+        const numVal = Number(value);
+        if (!value || isNaN(numVal) || numVal < 0) return; // skip empty/invalid
+
+        const product = products.find((p) => p.id === id);
+        if (!product) return;
+
+        const newStock = mode === "add" ? product.stock + numVal : numVal;
+        const prodRef = doc(db, "businesses", user.uid, "products", id);
+        batch.update(prodRef, { stock: newStock });
+        updateCount++;
+      });
+
+      if (updateCount === 0) {
+        setToastNotif({ message: "No changes to apply. Enter quantities first.", type: "error" });
+        setBulkSaving(false);
+        setBulkConfirmOpen(false);
+        return;
+      }
+
+      await batch.commit();
+      setToastNotif({
+        message: `Bulk stock updated for ${updateCount} product${updateCount > 1 ? "s" : ""} ✅`,
+        type: "success"
+      });
+      setBulkDialogOpen(false);
+      setBulkConfirmOpen(false);
+      setBulkChanges({});
+    } catch (err) {
+      console.error(err);
+      setToastNotif({ message: "Failed to apply bulk stock update.", type: "error" });
+    } finally {
+      setBulkSaving(false);
+    }
+  };
+
   // Trig helpers
   const openAddProduct = () => {
     setEditingProduct(null);
@@ -325,6 +435,17 @@ export const Products: React.FC = () => {
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
             </div>
+
+            {/* Bulk Stock Update Button */}
+            {products.length > 0 && (
+              <button
+                onClick={openBulkDialog}
+                className="flex items-center justify-center gap-1.5 px-4 py-2 bg-white border border-slate-200 text-slate-700 rounded-lg text-sm font-semibold hover:bg-slate-50 hover:border-slate-300 shadow-sm transition-all cursor-pointer"
+              >
+                <Package className="h-4 w-4 text-saffron" />
+                <span className="hidden sm:inline">Bulk Stock</span>
+              </button>
+            )}
 
             <button
               onClick={openAddProduct}
@@ -463,6 +584,13 @@ export const Products: React.FC = () => {
 
                         {/* Actions */}
                         <td className="px-6 py-3.5 text-right space-x-2">
+                          <button
+                            onClick={() => openStockDialog(product)}
+                            title="Update Stock"
+                            className="p-1.5 text-saffron hover:text-saffron-hover hover:bg-saffron/10 rounded-md border-0 bg-transparent cursor-pointer transition-colors"
+                          >
+                            <Package className="h-4 w-4" />
+                          </button>
                           <button
                             onClick={() => openEditProduct(product)}
                             className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-md border-0 bg-transparent cursor-pointer transition-colors"
@@ -731,6 +859,294 @@ export const Products: React.FC = () => {
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* ======================================================== */}
+      {/* 4. INDIVIDUAL STOCK UPDATE DIALOG */}
+      {stockDialogOpen && selectedProduct && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/40" onClick={() => setStockDialogOpen(false)}></div>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm relative z-10 border border-slate-100 mx-4 overflow-hidden animate-slide-in">
+            {/* Header */}
+            <div className="p-5 border-b border-slate-100 bg-gradient-to-r from-saffron/5 to-transparent">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="h-9 w-9 rounded-lg bg-saffron/10 flex items-center justify-center">
+                    <Package className="h-5 w-5 text-saffron" />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-bold text-slate-900">Update Stock</h3>
+                    <p className="text-xs text-slate-400 mt-0.5">{selectedProduct.name}</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setStockDialogOpen(false)}
+                  className="p-1 rounded-md hover:bg-slate-100 text-slate-400 hover:text-slate-600 border-0 bg-transparent cursor-pointer"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+
+            {/* Body */}
+            <div className="p-5 space-y-4">
+              {/* Current Stock Display */}
+              <div className="bg-slate-50 rounded-xl p-3.5 flex items-center justify-between border border-slate-100">
+                <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Current Stock</span>
+                <span className={`text-lg font-extrabold ${selectedProduct.stock < 10 ? "text-amber-600" : "text-slate-900"}`}>
+                  {selectedProduct.stock} {selectedProduct.unit}
+                </span>
+              </div>
+
+              {/* Mode Toggle */}
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setStockMode("add")}
+                  className={`flex-1 py-2.5 rounded-lg text-sm font-bold border-0 cursor-pointer transition-all duration-200 ${
+                    stockMode === "add"
+                      ? "bg-emerald-500 text-white shadow-md shadow-emerald-500/20"
+                      : "bg-slate-100 text-slate-500 hover:bg-slate-200"
+                  }`}
+                >
+                  + Add Stock
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setStockMode("set")}
+                  className={`flex-1 py-2.5 rounded-lg text-sm font-bold border-0 cursor-pointer transition-all duration-200 ${
+                    stockMode === "set"
+                      ? "bg-sky-500 text-white shadow-md shadow-sky-500/20"
+                      : "bg-slate-100 text-slate-500 hover:bg-slate-200"
+                  }`}
+                >
+                  = Set Stock
+                </button>
+              </div>
+
+              {/* Quantity Input */}
+              <div>
+                <label className="block text-xs font-bold text-slate-400 uppercase mb-1.5">
+                  {stockMode === "add" ? "Add quantity" : "Set exact quantity"}
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  placeholder="0"
+                  autoFocus
+                  className="block w-full border border-slate-200 rounded-lg px-3.5 py-3 text-lg font-bold text-center focus:outline-none focus:ring-2 focus:ring-saffron/20 focus:border-saffron text-slate-900 bg-slate-50/50"
+                  value={stockInput}
+                  onChange={(e) => setStockInput(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") handleStockConfirm(); }}
+                />
+              </div>
+
+              {/* Preview */}
+              {stockInput && Number(stockInput) >= 0 && (
+                <div className="bg-slate-50 rounded-lg p-2.5 text-center border border-slate-100">
+                  <span className="text-xs text-slate-400">New stock will be: </span>
+                  <span className="text-sm font-extrabold text-slate-900">
+                    {stockMode === "add" ? selectedProduct.stock + Number(stockInput) : Number(stockInput)} {selectedProduct.unit}
+                  </span>
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="p-5 border-t border-slate-100 flex gap-3 bg-slate-50/50">
+              <button
+                type="button"
+                onClick={() => setStockDialogOpen(false)}
+                className="flex-1 py-2.5 border border-slate-200 rounded-lg text-slate-600 text-sm font-semibold hover:bg-slate-50 cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleStockConfirm}
+                disabled={!stockInput || Number(stockInput) < 0}
+                className="flex-1 py-2.5 bg-saffron text-white rounded-lg text-sm font-bold hover:bg-saffron-hover shadow-md shadow-saffron/20 border-0 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+              >
+                Confirm Update
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ======================================================== */}
+      {/* 5. BULK STOCK UPDATE DIALOG */}
+      {bulkDialogOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/40" onClick={() => setBulkDialogOpen(false)}></div>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl relative z-10 border border-slate-100 mx-4 overflow-hidden animate-slide-in flex flex-col" style={{ maxHeight: "85vh" }}>
+            {/* Header */}
+            <div className="p-5 border-b border-slate-100 bg-gradient-to-r from-saffron/5 to-transparent shrink-0">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="h-9 w-9 rounded-lg bg-saffron/10 flex items-center justify-center">
+                    <Package className="h-5 w-5 text-saffron" />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-bold text-slate-900">Bulk Stock Update</h3>
+                    <p className="text-xs text-slate-400 mt-0.5">Update stock levels for multiple products at once</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setBulkDialogOpen(false)}
+                  className="p-1 rounded-md hover:bg-slate-100 text-slate-400 hover:text-slate-600 border-0 bg-transparent cursor-pointer"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+
+            {/* Product List */}
+            <div className="flex-1 overflow-y-auto p-4 space-y-2">
+              {products.map((product) => {
+                const change = bulkChanges[product.id] || { mode: "add", value: "" };
+                return (
+                  <div
+                    key={product.id}
+                    className="flex items-center gap-3 p-3 rounded-xl border border-slate-100 hover:border-slate-200 bg-white transition-colors"
+                  >
+                    {/* Product Info */}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-bold text-slate-900 truncate">{product.name}</p>
+                      <p className={`text-xs font-semibold mt-0.5 ${product.stock < 10 ? "text-amber-600" : "text-slate-400"}`}>
+                        Current: {product.stock} {product.unit}
+                        {product.stock < 10 && " ⚠️"}
+                      </p>
+                    </div>
+
+                    {/* Mode Toggle */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setBulkChanges((prev) => ({
+                          ...prev,
+                          [product.id]: {
+                            ...prev[product.id],
+                            mode: prev[product.id]?.mode === "add" ? "set" : "add"
+                          }
+                        }));
+                      }}
+                      className={`px-2.5 py-1.5 rounded-lg text-[10px] font-extrabold uppercase tracking-wider border-0 cursor-pointer transition-all duration-200 shrink-0 ${
+                        change.mode === "add"
+                          ? "bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+                          : "bg-sky-50 text-sky-700 hover:bg-sky-100"
+                      }`}
+                    >
+                      {change.mode === "add" ? "+ Add" : "= Set"}
+                    </button>
+
+                    {/* Quantity Input */}
+                    <input
+                      type="number"
+                      min="0"
+                      placeholder="0"
+                      className="w-20 border border-slate-200 rounded-lg px-2.5 py-2 text-sm font-bold text-center focus:outline-none focus:ring-2 focus:ring-saffron/20 focus:border-saffron text-slate-900 bg-slate-50/50"
+                      value={change.value}
+                      onChange={(e) => {
+                        setBulkChanges((prev) => ({
+                          ...prev,
+                          [product.id]: {
+                            ...prev[product.id],
+                            value: e.target.value
+                          }
+                        }));
+                      }}
+                    />
+
+                    {/* Preview */}
+                    {change.value && Number(change.value) >= 0 && (
+                      <span className="text-xs font-bold text-slate-500 shrink-0 w-16 text-right">
+                        → {change.mode === "add" ? product.stock + Number(change.value) : Number(change.value)}
+                      </span>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Footer */}
+            <div className="p-4 border-t border-slate-100 flex gap-3 bg-slate-50/50 shrink-0">
+              <button
+                type="button"
+                onClick={() => setBulkDialogOpen(false)}
+                className="flex-1 py-2.5 border border-slate-200 rounded-lg text-slate-600 text-sm font-semibold hover:bg-slate-50 cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => setBulkConfirmOpen(true)}
+                disabled={!Object.values(bulkChanges).some((c) => c.value && Number(c.value) >= 0)}
+                className="flex-1 py-2.5 bg-saffron text-white rounded-lg text-sm font-bold hover:bg-saffron-hover shadow-md shadow-saffron/20 border-0 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+              >
+                Update All
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ======================================================== */}
+      {/* 6. BULK CONFIRM DIALOG */}
+      {bulkConfirmOpen && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/50" onClick={() => setBulkConfirmOpen(false)}></div>
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-sm p-6 relative z-10 border border-slate-100 mx-4">
+            <h3 className="text-lg font-bold text-slate-900 mb-2">Confirm Bulk Update?</h3>
+            <p className="text-sm text-slate-500 mb-6">
+              This will update stock levels for {Object.values(bulkChanges).filter((c) => c.value && Number(c.value) >= 0).length} product(s). This action cannot be undone.
+            </p>
+            <div className="flex gap-3 justify-end">
+              <button
+                type="button"
+                onClick={() => setBulkConfirmOpen(false)}
+                disabled={bulkSaving}
+                className="px-4 py-2 border border-slate-200 rounded-lg text-slate-600 text-sm font-semibold hover:bg-slate-50 cursor-pointer disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleBulkUpdate}
+                disabled={bulkSaving}
+                className="px-4 py-2 bg-saffron text-white rounded-lg text-sm font-bold hover:bg-saffron-hover shadow-md shadow-saffron/20 border-0 cursor-pointer flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {bulkSaving ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Updating...
+                  </>
+                ) : (
+                  "Confirm Update"
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ======================================================== */}
+      {/* 7. FLOATING TOAST NOTIFICATION */}
+      {toastNotif && (
+        <div
+          className={`fixed bottom-6 right-6 z-[70] flex items-center gap-3 px-4 py-3 rounded-xl shadow-2xl border text-white animate-slide-in transition-all duration-300 ${
+            toastNotif.type === "success"
+              ? "bg-slate-900/95 border-emerald-500/30 shadow-emerald-500/5"
+              : "bg-red-950/95 border-red-500/30 shadow-red-500/5"
+          }`}
+        >
+          {toastNotif.type === "success" ? (
+            <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0" />
+          ) : (
+            <XCircle className="h-4 w-4 text-red-400 shrink-0" />
+          )}
+          <span className="text-xs font-bold tracking-wide">{toastNotif.message}</span>
         </div>
       )}
     </SidebarLayout>
