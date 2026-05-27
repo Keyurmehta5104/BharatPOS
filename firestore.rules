@@ -1,0 +1,35 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    match /businesses/{userId} {
+      // Owner (authenticated with their own UID) can read/write everything
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+
+      // Sub-collections — owner full access
+      match /{subCollection}/{docId} {
+        allow read, write: if request.auth != null && request.auth.uid == userId;
+      }
+
+      // KOTs — public read (kitchen tablet uses PIN, not Firebase Auth)
+      //         kitchen can update status fields only
+      //         owner can write anything
+      match /kots/{kotId} {
+        allow read: if true;
+        allow write: if request.auth != null && request.auth.uid == userId;
+        allow update: if true
+          && request.resource.data.diff(resource.data).affectedKeys()
+              .hasOnly(["status", "startedAt", "readyAt"]);
+      }
+
+      // Kitchen settings — public read so kitchen tablet can verify PIN
+      //                    only owner can write
+      match /settings/{settingId} {
+        allow read: if true;
+        allow write: if request.auth != null && request.auth.uid == userId;
+      }
+    }
+
+  }
+}
