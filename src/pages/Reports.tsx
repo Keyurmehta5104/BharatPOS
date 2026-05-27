@@ -103,7 +103,6 @@ export const Reports: React.FC = () => {
 
   // Date Filtering Logic
   const filteredOrders = useMemo(() => {
-    const now = new Date();
     let start = new Date();
     let end = new Date();
 
@@ -447,7 +446,7 @@ export const Reports: React.FC = () => {
                     <YAxis dataKey="name" type="category" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748B' }} width={100} />
                     <RechartsTooltip content={<CustomTooltip />} cursor={{ fill: '#F1F5F9' }} />
                     <Bar dataKey="qty" name="Qty Sold" fill="#3B82F6" radius={[0, 4, 4, 0]}>
-                      {topItems.map((entry, index) => (
+                      {topItems.map((_entry, index) => (
                         <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                       ))}
                     </Bar>
@@ -471,7 +470,7 @@ export const Reports: React.FC = () => {
                       outerRadius={80}
                       labelLine={false}
                     >
-                      {categorySales.map((entry, index) => (
+                      {categorySales.map((_entry, index) => (
                         <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                       ))}
                     </Pie>

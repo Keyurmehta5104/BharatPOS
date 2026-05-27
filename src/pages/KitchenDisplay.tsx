@@ -167,24 +167,6 @@ export const KitchenDisplay: React.FC = () => {
     return () => unsub();
   }, [ownerUid]);
 
-  const handleAdvanceStatus = async (kot: KOT) => {
-    if (!ownerUid || !statusConfig[kot.status].nextStatus) return;
-    setUpdatingId(kot.id);
-    try {
-      const next = statusConfig[kot.status].nextStatus!;
-      const updates: Record<string, any> = { status: next };
-      if (next === "In Progress") updates.startedAt = new Date().toISOString();
-      if (next === "Ready") updates.readyAt = new Date().toISOString();
-
-      const kotRef = doc(db, "businesses", ownerUid, "kots", kot.id);
-      await updateDoc(kotRef, updates);
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setUpdatingId(null);
-    }
-  };
-
   const handleItemStatusChange = async (kot: KOT, index: number) => {
     if (!ownerUid) return;
     const newItems = [...kot.items];
@@ -338,7 +320,6 @@ export const KitchenDisplay: React.FC = () => {
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
             {sortedKots.map((kot) => {
               const cfg = statusConfig[kot.status];
-              const ActionIcon = cfg.actionIcon;
               const tableDisplay = kot.tableName || kot.tableNumber || "?";
               const isNewKot = isNew(kot.createdAt);
               const isUpdating = updatingId === kot.id;
